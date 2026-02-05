@@ -11,21 +11,22 @@
   <style>
     html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
     body { font-family: "Open Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; overflow: hidden; }
-    #map { position: fixed; inset: 0; } /* FULL SCREEN */
+    #map { position: fixed; inset: 0; }
 
-    #menu {
+    #panel {
       position: fixed;
       z-index: 2;
       top: 12px;
       right: 12px;
-      width: 290px;
-      background: rgba(255, 255, 255, 0.95);
+      width: 310px;
+      background: rgba(255,255,255,0.95);
       border: 1px solid rgba(0,0,0,0.2);
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 2px 14px rgba(0,0,0,0.15);
     }
-    #menu .header {
+
+    #panel .title {
       padding: 10px 12px;
       font-size: 13px;
       font-weight: 700;
@@ -33,122 +34,107 @@
       border-bottom: 1px solid rgba(0,0,0,0.12);
       text-align: center;
     }
-    #menu .desc {
+
+    #panel .subtitle {
       padding: 10px 12px;
       font-size: 12px;
       line-height: 1.35;
       color: #333;
       border-bottom: 1px solid rgba(0,0,0,0.12);
     }
-    #menu a {
-      display: block;
+
+    #layers {
       padding: 10px 12px;
-      text-decoration: none;
+      display: grid;
+      gap: 8px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       font-size: 13px;
       color: #222;
-      border-bottom: 1px solid rgba(0,0,0,0.10);
-      user-select: none;
     }
-    #menu a:last-child { border-bottom: none; }
-    #menu a:hover { background: #f7f7f7; }
-    #menu a.active { background: #2b7bb9; color: #fff; }
-    #menu a.active:hover { background: #256a9f; }
+
+    .row input { transform: scale(1.1); }
+
+    .hint {
+      padding: 0 12px 12px 12px;
+      font-size: 11px;
+      color: #555;
+      line-height: 1.35;
+    }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
 
-  <nav id="menu">
-    <div class="header">Lab 4: Metro Stops (Seattle–Eastside)</div>
-    <div class="desc">
-      Default basemap is from Mapbox (online). Toggle the 4 local tilesets (exported from QGIS/QMetaTiles) below.
+  <div id="panel">
+    <div class="title">Lab 4: Metro Stops (Seattle–Eastside)</div>
+    <div class="subtitle">Mapbox basemap loads by default. Turn on any local tilesets below.</div>
+    <div id="layers">
+      <label class="row"><input id="cb1" type="checkbox"> tileset_1 (Local basemap)</label>
+      <label class="row"><input id="cb2" type="checkbox"> tileset_2 (Metro stops overlay)</label>
+      <label class="row"><input id="cb3" type="checkbox"> tileset_3 (Basemap + stops composite)</label>
+      <label class="row"><input id="cb4" type="checkbox"> tileset_4 (Transit-themed basemap)</label>
     </div>
-
-    <!-- Required: four local tilesets toggles -->
-    <a href="#" data-layer="tileset_1">Tileset 1: Local Basemap</a>
-    <a href="#" data-layer="tileset_2">Tileset 2: Metro Stops (Overlay)</a>
-    <a href="#" data-layer="tileset_3">Tileset 3: Basemap + Stops (Composite)</a>
-    <a href="#" data-layer="tileset_4">Tileset 4: Transit-themed Basemap</a>
-  </nav>
+    <div class="hint">If a local layer looks blank, zoom between 10–13 and make sure the folder path is assets/tileset_X/{z}/{x}/{y}.png.</div>
+  </div>
 
   <script>
     mapboxgl.accessToken = "pk.eyJ1IjoianN1MyIsImEiOiJjbWhlZW45ZTcwZGR4Mm1wd2FoNmc1eGx4In0.1uDkRhqn0WIQeUtnhvLPOA";
 
-    // This is the "external" basemap you want shown on page load
     const map = new mapboxgl.Map({
       container: "map",
-      style: "mapbox://styles/mapbox/light-v11", // you can change to streets-v12, etc.
+      style: "mapbox://styles/mapbox/light-v11",
       center: [-122.33, 47.61],
       zoom: 11
     });
 
-    // Required UI elements
     map.addControl(new mapboxgl.NavigationControl(), "top-left");
     map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: "imperial" }));
     map.addControl(new mapboxgl.AttributionControl({ compact: true }));
 
-    // Helper functions
-    const BASE_LIKE = new Set(["tileset_1", "tileset_3", "tileset_4"]); // these are "full-map" tiles
-    function getVis(id) { return map.getLayoutProperty(id, "visibility"); }
-    function setVis(id, v) { map.setLayoutProperty(id, "visibility", v); }
-    function setActiveLink(id, on) {
-      const link = document.querySelector(`#menu a[data-layer="${id}"]`);
-      if (link) link.classList.toggle("active", on);
+    function setVis(id, visible) {
+      if (!map.getLayer(id)) return;
+      map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    }
+
+    function syncRules(changedId) {
+      const cb1 = document.getElementById("cb1");
+      const cb2 = document.getElementById("cb2");
+      const cb3 = document.getElementById("cb3");
+      const cb4 = document.getElementById("cb4");
+
+      const baseLike = ["tileset_1", "tileset_3", "tileset_4"];
+
+      if (changedId === "tileset_1" && cb1.checked) { cb3.checked = false; cb4.checked = false; }
+      if (changedId === "tileset_3" && cb3.checked) { cb1.checked = false; cb4.checked = false; cb2.checked = false; }
+      if (changedId === "tileset_4" && cb4.checked) { cb1.checked = false; cb3.checked = false; }
+
+      setVis("tileset_1", cb1.checked);
+      setVis("tileset_2", cb2.checked);
+      setVis("tileset_3", cb3.checked);
+      setVis("tileset_4", cb4.checked);
     }
 
     map.on("load", () => {
-      // Sources (underscore paths!)
       map.addSource("src1", { type: "raster", tiles: ["assets/tileset_1/{z}/{x}/{y}.png"], tileSize: 256 });
       map.addSource("src2", { type: "raster", tiles: ["assets/tileset_2/{z}/{x}/{y}.png"], tileSize: 256 });
       map.addSource("src3", { type: "raster", tiles: ["assets/tileset_3/{z}/{x}/{y}.png"], tileSize: 256 });
       map.addSource("src4", { type: "raster", tiles: ["assets/tileset_4/{z}/{x}/{y}.png"], tileSize: 256 });
 
-      // Layers are added ABOVE the Mapbox basemap
       map.addLayer({ id: "tileset_1", type: "raster", source: "src1", layout: { visibility: "none" } });
-      map.addLayer({ id: "tileset_2", type: "raster", source: "src2", layout: { visibility: "none" } }); // overlay
+      map.addLayer({ id: "tileset_2", type: "raster", source: "src2", layout: { visibility: "none" } });
       map.addLayer({ id: "tileset_3", type: "raster", source: "src3", layout: { visibility: "none" } });
       map.addLayer({ id: "tileset_4", type: "raster", source: "src4", layout: { visibility: "none" } });
-    });
 
-    // Click handler for toggles
-    document.getElementById("menu").addEventListener("click", (e) => {
-      const link = e.target.closest("a[data-layer]");
-      if (!link) return;
-      e.preventDefault();
-
-      const id = link.getAttribute("data-layer");
-      if (!map.getLayer(id)) return;
-
-      const isOn = (getVis(id) === "visible");
-      const next = isOn ? "none" : "visible";
-
-      // If turning on a "basemap-like" local layer, turn off other basemap-like layers to avoid stacking.
-      if (BASE_LIKE.has(id) && next === "visible") {
-        for (const other of BASE_LIKE) {
-          if (other !== id && map.getLayer(other)) {
-            setVis(other, "none");
-            setActiveLink(other, false);
-          }
-        }
-        // Also: composite already includes stops; if you turn on tileset_3, you probably don't want overlay stops too.
-        if (id === "tileset_3" && map.getLayer("tileset_2")) {
-          setVis("tileset_2", "none");
-          setActiveLink("tileset_2", false);
-        }
-      }
-
-      // tileset_2 is overlay: can be toggled with tileset_1 or tileset_4, but not necessary with tileset_3.
-      if (id === "tileset_2" && next === "visible") {
-        // If composite is currently on, turn it off to avoid double stops/basemap
-        if (map.getLayer("tileset_3") && getVis("tileset_3") === "visible") {
-          setVis("tileset_3", "none");
-          setActiveLink("tileset_3", false);
-        }
-      }
-
-      setVis(id, next);
-      setActiveLink(id, next === "visible");
+      document.getElementById("cb1").addEventListener("change", () => syncRules("tileset_1"));
+      document.getElementById("cb2").addEventListener("change", () => syncRules("tileset_2"));
+      document.getElementById("cb3").addEventListener("change", () => syncRules("tileset_3"));
+      document.getElementById("cb4").addEventListener("change", () => syncRules("tileset_4"));
     });
   </script>
 </body>
